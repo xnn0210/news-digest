@@ -1,0 +1,63 @@
+# 每天在 GitHub 云端抓取新闻、翻译、生成网页，并发布到 GitHub Pages
+name: 更新新闻
+
+on:
+  schedule:
+    # GitHub 用 UTC 时间：两个时间分别对应英国夏令时和冬令时的早上 7:00
+    - cron: "0 6 * * *"
+    - cron: "0 7 * * *"
+  workflow_dispatch:   # 也可以在 Actions 页面手动点 "Run workflow"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 恢复数据库(30 天归档和已有译文)
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: newsdb-${{ github.run_id }}
+          restore-keys: newsdb-
+
+      - name: 抓取、翻译并生成网页
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # 没设置时跳过翻译
+        run: python newsdigest.py update
+
+      - name: 保存数据库
+        if: always() && hashFiles('data/news.db') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: data
+          key: newsdb-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

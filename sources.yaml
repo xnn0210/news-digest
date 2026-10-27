@@ -1,0 +1,295 @@
+# 每日新闻 — 新闻源配置
+#
+# 只收录主流、免费、有官方 RSS 的新闻网站。
+# 每篇文章有两个维度：栏目(内容类型，一篇一个)和地区(按国家/城市/人物识别，可以有两个)。
+#
+# 每个 feed 可以写:
+#   url:      官方 RSS 地址
+#   section:  这个 feed 属于哪个栏目(见 sections)；不写则按 classify 的关键词判断，判断不出归入 news(时政)
+#   default:  内容比较杂的 feed：先按关键词判断栏目，判断不出再归入这个栏目
+#   region:   标题和摘要里认不出地区时用的默认地区(见 regions)，例如英国本地新闻的 feed 写 europe
+#   opinion:  true 表示评论文章，页面上会标"评论"
+#   rank:     true 表示这是媒体的首页头条 feed(按编辑排序)，用来挑选"要闻"
+#   lang:     覆盖来源的语言(en / zh)
+#
+# 来源可选项: t2s: true 把繁体字转成简体；exclude: [正则] 标题匹配则丢弃；keep_query: true 保留链接里的 ?参数
+
+settings:
+  max_age_hours: 48      # 只收录这么多小时以内发布的文章
+  keep_days: 30          # 数据库与归档页面保留天数
+  timezone: Europe/London  # 按哪个时区划分"每天"(云端服务器是 UTC，所以写明时区)；local = 电脑当前时区
+  timeout: 20            # 单个 feed 超时(秒)
+  workers: 12            # 并发抓取数
+
+# 用 Claude 把英文新闻的标题和摘要翻译成中文(需要在 .env 里设置 ANTHROPIC_API_KEY)
+# 每篇只翻译一次，结果存在数据库里；原文有改动时会重新翻译
+translate:
+  enabled: true
+  model: claude-haiku-5-5   # 想要更好的译文可换成 claude-sonnet-5-5 或 claude-opus-5-5(贵 20–40 倍)
+  batch_size: 30            # 每次请求翻译多少篇
+  workers: 4                # 并发请求数
+  max_per_run: 2000         # 每次运行最多翻译多少篇，防止意外花费
+
+# 栏目：顶部导航，按这里的顺序显示
+sections:
+  news: 时政
+  business: 财经
+  tech: 科技
+  science: 科学与健康
+  culture: 文化
+  sport: 体育
+
+# 地区：按关键词识别。中文按包含匹配；英文按整词匹配，含大写字母的词区分大小写(China ≠ china)
+regions:
+  china:
+    name: 中国
+    keywords: [China, Chinese, Beijing, Shanghai, Shenzhen, Guangzhou, Wuhan, Hong Kong, Macau, Taiwan, Taiwanese, Taipei,
+               Xi Jinping, Tibet, Xinjiang, Uyghur, Huawei, Alibaba, Tencent, BYD, DeepSeek, Xiaomi,
+               中国, 中方, 我国, 北京, 上海, 深圳, 广州, 武汉, 重庆, 天津, 香港, 澳门, 台湾, 台北, 两岸, 国台办, 陆委会, 习近平, 李强,
+               国务院, 中共, 全国人大, 政协, 人民币, 西藏, 新疆, 内地, 大陆, 河北, 山西, 辽宁, 吉林, 黑龙江, 江苏, 浙江, 安徽, 福建,
+               江西, 山东, 河南, 湖北, 湖南, 广东, 海南, 四川, 贵州, 云南, 陕西, 甘肃, 青海, 内蒙古, 广西, 宁夏, 杭州, 南京, 成都,
+               西安, 苏州, 厦门, 青岛, 长沙, 郑州, 济南, 沈阳, 哈尔滨, 昆明, 大连, 宁波]
+  asia:
+    name: 亚太
+    keywords: [Asia, Asian, Japan, Japanese, Tokyo, Takaichi, South Korea, North Korea, Korean, Seoul, Pyongyang, Kim Jong Un,
+               India, Indian, Modi, Delhi, Mumbai, Pakistan, Pakistani, Islamabad, Bangladesh, Sri Lanka, Nepal, Afghanistan, Taliban,
+               Kabul, Singapore, Singaporean, Malaysia, Malaysian, Indonesia, Indonesian, Jakarta, Thailand, Thai, Bangkok, Vietnam,
+               Vietnamese, Philippines, Philippine, Filipino, Manila, Myanmar, Cambodia, Laos, ASEAN, Australia, Australian,
+               Canberra, Sydney, Melbourne, New Zealand, Kazakhstan,
+               亚洲, 日本, 东京, 高市, 韩国, 首尔, 朝鲜, 平壤, 金正恩, 印度, 新德里, 莫迪, 巴基斯坦, 孟加拉, 斯里兰卡, 尼泊尔, 阿富汗,
+               塔利班, 新加坡, 马来西亚, 印尼, 泰国, 曼谷, 越南, 菲律宾, 缅甸, 柬埔寨, 老挝, 东盟, 澳大利亚, 澳洲, 新西兰, 蒙古国, 哈萨克斯坦]
+  europe:
+    name: 欧洲
+    keywords: [Europe, European, EU, Brussels, UK, U.K., Britain, British, England, Scotland, Scottish, Wales, Welsh, Northern Ireland, London,
+               Starmer, Burnham, Reeves, RAF, Westminster, Downing Street, NHS, Labour, Tories, Tory, Lib Dems, Holyrood, Germany, German, Berlin, Merz, France, French, Paris, Macron,
+               Italy, Italian, Rome, Meloni, Spain, Spanish, Madrid, Portugal, Netherlands, Dutch, Belgium, Switzerland, Swiss,
+               Austria, Poland, Warsaw, Ukraine, Ukrainian, Kyiv, Zelensky, Russia, Russian, Moscow, Kremlin, Putin, Sweden, Swedish,
+               Norway, Norwegian, Denmark, Danish, Finland, Finnish, Ireland, Irish, Dublin, Greece, Greek, Hungary, Orban, Czech,
+               Romania, Serbia, Balkans, Belarus, NATO, Turkey, Turkish, Erdogan,
+               欧洲, 欧盟, 英国, 伦敦, 苏格兰, 威尔士, 北爱尔兰, 斯塔默, 伯纳姆, 唐宁街, 德国, 柏林, 默茨, 法国, 巴黎, 马克龙, 意大利, 罗马,
+               梅洛尼, 西班牙, 葡萄牙, 荷兰, 比利时, 布鲁塞尔, 瑞士, 奥地利, 波兰, 乌克兰, 基辅, 泽连斯基, 俄罗斯, 俄方, 莫斯科,
+               克里姆林宫, 普京, 俄乌, 瑞典, 挪威, 丹麦, 芬兰, 爱尔兰, 希腊, 匈牙利, 捷克, 塞尔维亚, 白俄罗斯, 北约, 土耳其, 埃尔多安]
+  americas:
+    name: 美洲
+    keywords: [US, U.S., USA, America, American, Americans, Washington, White House, Trump, Vance, Congress, Senate, Pentagon,
+               Republicans, Democrats, New York, California, Texas, Florida, Chicago, midterms, Federal Reserve, Fed, Wall Street,
+               Canada, Canadian, Ottawa, Carney, Mexico, Mexican, Brazil, Brazilian, Lula, Bolsonaro, Argentina, Milei, Venezuela,
+               Maduro, Colombia, Chile, Peru, Cuba, Haiti, Latin America, Caribbean,
+               美国, 美方, 华盛顿, 白宫, 特朗普, 万斯, 五角大楼, 共和党, 纽约, 加州, 得州, 德州, 佛罗里达, 芝加哥, 中期选举, 美联储, 华尔街,
+               加拿大, 渥太华, 墨西哥, 巴西, 卢拉, 博索纳罗, 阿根廷, 委内瑞拉, 马杜罗, 哥伦比亚, 智利, 秘鲁, 古巴, 海地, 拉美, 加勒比]
+  mideast:
+    name: 中东
+    keywords: [Middle East, Israel, Israeli, Israelis, Gaza, West Bank, Palestinian, Palestinians, Hamas, Hezbollah, Netanyahu,
+               Jerusalem, Tel Aviv, Iran, Iranian, Tehran, Khamenei, Iraq, Iraqi, Baghdad, Syria, Syrian, Damascus, Lebanon, Lebanese,
+               Beirut, Saudi, Riyadh, Yemen, Houthi, Houthis, UAE, Dubai, Abu Dhabi, Qatar, Doha, Kuwait, Oman, Bahrain, Egypt,
+               Egyptian, Cairo, Jordanian, Hormuz,
+               中东, 以色列, 以方, 加沙, 约旦河西岸, 巴勒斯坦, 哈马斯, 真主党, 内塔尼亚胡, 耶路撒冷, 伊朗, 德黑兰, 哈梅内伊, 伊拉克, 巴格达,
+               叙利亚, 大马士革, 黎巴嫩, 贝鲁特, 沙特, 利雅得, 也门, 胡塞, 阿联酋, 迪拜, 卡塔尔, 多哈, 科威特, 巴林, 埃及, 开罗, 约旦, 霍尔木兹]
+  africa:
+    name: 非洲
+    keywords: [Africa, African, Nigeria, Nigerian, Kenya, Kenyan, Nairobi, South Africa, Ethiopia, Ethiopian, Sudan, Sudanese,
+               Somalia, Congo, DRC, Uganda, Rwanda, Tanzania, Ghana, Senegal, Mali, Niger, Morocco, Algeria, Algerian, Tunisia,
+               Libya, Libyan, Zimbabwe, Mozambique, Cameroon, Sahel,
+               非洲, 尼日利亚, 肯尼亚, 南非, 埃塞俄比亚, 苏丹, 索马里, 刚果, 乌干达, 卢旺达, 坦桑尼亚, 加纳, 塞内加尔, 马里, 尼日尔, 摩洛哥,
+               阿尔及利亚, 突尼斯, 利比亚, 津巴布韦, 莫桑比克, 喀麦隆, 萨赫勒]
+
+# 栏目关键词：用于没写 section 的 feed，以及一篇文章同时出现在多个栏目 feed 里时做判断；
+# 标题命中算 2 分、摘要命中算 1 分，至少 2 分才算数
+classify:
+  news: [war, ceasefire, truce, election, elections, vote, voters, ballot, campaign, troops, military, missile, missiles, airstrike, airstrikes, attack, attacks, killed, police,
+         court, trial, judge, president, prime minister, minister, parliament, protest, protests, sanctions, refugees,
+         migrants, diplomatic, diplomacy, summit, militants, coup,
+         选举, 大选, 投票, 战争, 停火, 军队, 军事, 导弹, 空袭, 袭击, 遇难, 警方, 法院, 审判, 总统, 总理, 部长, 议会, 抗议, 制裁, 难民, 外交, 峰会]
+  business: [economy, inflation, GDP, interest rate, interest rates, central bank, Federal Reserve, Fed, ECB,
+             Bank of England, recession, tariff, tariffs, trade deal, trade war, unemployment, IMF, World Bank, stocks, shares,
+             equities, bonds, gilts, investors, Wall Street, Nasdaq, FTSE, oil prices, currency, dollar, bitcoin, crypto, CEO, merger, acquisition, takeover, earnings, profit, profits, revenue, IPO,
+             经济, 通胀, 利率, 央行, 美联储, 关税, 贸易战, 失业, 财政, 货币政策, 股市, 股票, 股价, 债券, 汇率, 比特币, 投资者, 港股, A股,
+             美股, 基金, 公司, 企业, 收购, 并购, 财报, 利润, 营收, 上市, 银行, 金融, 外贸, 出口, 制造业, 产业, 楼市, 房地产]
+  tech: [AI, artificial intelligence, chip, chips, semiconductor, semiconductors, Nvidia, OpenAI, Anthropic, Apple, Google,
+         Microsoft, software, cyber, cyberattack, hackers, robot, robots, smartphone, iPhone, internet, social media, TikTok,
+         data centre, data center, quantum,
+         人工智能, 芯片, 半导体, 科技, 英伟达, 苹果公司, 谷歌, 微软, 自动驾驶, 机器人, 大模型, 智能手机, 互联网, 网络安全, 黑客, 算力, 数据中心, 量子]
+  science: [science, scientists, researchers, study, space, NASA, astronaut, astronauts, rocket, Mars, climate, climate change,
+            emissions, species, wildlife, fossil, dinosaur, health, disease, virus, vaccine, vaccines, cancer, Ebola, measles,
+            outbreak, hospital, hospitals, doctors, medicine, mental health, WHO,
+            科学, 科学家, 科研, 研究发现, 研究人员, 航天, 太空, 火箭, 宇航员, 月球, 火星, 气候, 碳排放, 物种, 野生动物, 化石, 恐龙, 健康,
+            疾病, 病毒, 疫苗, 癌症, 埃博拉, 麻疹, 疫情, 医院, 医生, 医疗, 医学, 卫生, 世卫]
+  culture: [film, films, movie, movies, cinema, actor, actress, music, album, singer, concert, artist, museum, exhibition, novel,
+            author, festival, theatre, theater, television, Netflix, Hollywood, Oscars, Grammy, celebrity, fashion,
+            电影, 影片, 演员, 导演, 音乐, 专辑, 歌手, 演唱会, 艺术, 艺术家, 博物馆, 展览, 文物, 图书, 小说, 作家, 文学, 电影节, 戏剧,
+            话剧, 综艺, 电视剧, 明星, 时尚, 非遗]
+  sport: [football, soccer, Premier League, Champions League, World Cup, tennis, golf, cricket, rugby, F1, Formula One, Grand Prix,
+          NBA, NFL, Olympic, Olympics, athlete, athletes, Ballon d'Or, Wimbledon, marathon, boxing,
+          足球, 篮球, 排球, 网球, 高尔夫, 橄榄球, 世界杯, 欧冠, 英超, 中超, 联赛, 奥运, 冬奥, 运动员, 夺冠, 金球奖, 马拉松, 拳击, 体育]
+
+sources:
+  # ---------- 英文 ----------
+  - id: bbc
+    name: BBC
+    en: BBC News
+    lang: en
+    feeds:
+      - {url: "https://feeds.bbci.co.uk/news/rss.xml", rank: true, region: europe}
+      - {url: "https://feeds.bbci.co.uk/news/world/rss.xml", section: news, rank: true}
+      - {url: "https://feeds.bbci.co.uk/news/uk/rss.xml", section: news, region: europe}
+      - {url: "https://feeds.bbci.co.uk/news/world/asia/rss.xml", section: news, region: asia}
+      - {url: "https://feeds.bbci.co.uk/news/business/rss.xml", section: business}
+      - {url: "https://feeds.bbci.co.uk/news/technology/rss.xml", section: tech}
+      - {url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", section: science}
+      - {url: "https://feeds.bbci.co.uk/news/health/rss.xml", section: science}
+      - {url: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml", section: culture}
+      - {url: "https://feeds.bbci.co.uk/sport/rss.xml", section: sport}
+
+  - id: guardian
+    name: 卫报
+    en: The Guardian
+    lang: en
+    feeds:
+      - {url: "https://www.theguardian.com/world/rss", section: news}
+      - {url: "https://www.theguardian.com/politics/rss", section: news, region: europe}
+      - {url: "https://www.theguardian.com/world/china/rss", section: news, region: china}
+      - {url: "https://www.theguardian.com/business/economics/rss", section: business}
+      - {url: "https://www.theguardian.com/uk/business/rss", section: business}
+      - {url: "https://www.theguardian.com/uk/technology/rss", section: tech}
+      - {url: "https://www.theguardian.com/science/rss", section: science}
+      - {url: "https://www.theguardian.com/environment/rss", section: science}
+      - {url: "https://www.theguardian.com/culture/rss", section: culture}
+      - {url: "https://www.theguardian.com/sport/rss", section: sport}
+      - {url: "https://www.theguardian.com/uk/commentisfree/rss", opinion: true}
+
+  - id: sky
+    name: 天空新闻
+    en: Sky News
+    lang: en
+    feeds:
+      - {url: "https://feeds.skynews.com/feeds/rss/home.xml", rank: true, region: europe}
+      - {url: "https://feeds.skynews.com/feeds/rss/world.xml", section: news}
+      - {url: "https://feeds.skynews.com/feeds/rss/uk.xml", section: news, region: europe}
+      - {url: "https://feeds.skynews.com/feeds/rss/business.xml", section: business, region: europe}
+      - {url: "https://feeds.skynews.com/feeds/rss/technology.xml", section: tech}
+      - {url: "https://feeds.skynews.com/feeds/rss/entertainment.xml", section: culture}
+
+  - id: npr
+    name: NPR
+    en: National Public Radio
+    lang: en
+    feeds:
+      - {url: "https://feeds.npr.org/1001/rss.xml", region: americas}
+      - {url: "https://feeds.npr.org/1004/rss.xml", section: news}
+      - {url: "https://feeds.npr.org/1006/rss.xml", section: business, region: americas}
+      - {url: "https://feeds.npr.org/1019/rss.xml", section: tech}
+      - {url: "https://feeds.npr.org/1007/rss.xml", section: science}
+      - {url: "https://feeds.npr.org/1128/rss.xml", section: science, region: americas}
+      - {url: "https://feeds.npr.org/1008/rss.xml", section: culture}
+
+  - id: dw
+    name: 德国之声
+    en: Deutsche Welle
+    lang: en
+    feeds:
+      - {url: "https://rss.dw.com/rdf/rss-en-world", section: news}
+      - {url: "https://rss.dw.com/rdf/rss-en-asia", section: news, region: asia}
+      - {url: "https://rss.dw.com/rdf/rss-en-bus", section: business}
+      - {url: "https://rss.dw.com/rdf/rss-en-cul", section: culture}
+
+  - id: france24
+    name: 法国24
+    en: France 24
+    lang: en
+    feeds:
+      - {url: "https://www.france24.com/en/rss"}
+      - {url: "https://www.france24.com/en/asia-pacific/rss", section: news, region: asia}
+      - {url: "https://www.france24.com/en/business/rss", section: business}
+      - {url: "https://www.france24.com/en/environment/rss", section: science}
+      - {url: "https://www.france24.com/en/culture/rss", section: culture}
+      - {url: "https://www.france24.com/en/sport/rss", section: sport}
+
+  - id: aljazeera
+    name: 半岛电视台
+    en: Al Jazeera
+    lang: en
+    feeds:
+      - {url: "https://www.aljazeera.com/xml/rss/all.xml"}
+
+  - id: cna
+    name: 亚洲新闻台
+    en: CNA
+    lang: en
+    feeds:
+      - {url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311", section: news}
+      - {url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511", section: news, region: asia}
+      - {url: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936", section: business}
+
+  - id: cnbc
+    name: CNBC
+    en: CNBC
+    lang: en
+    feeds:
+      - {url: "https://www.cnbc.com/id/100727362/device/rss/rss.html", default: business}
+      - {url: "https://www.cnbc.com/id/20910258/device/rss/rss.html", default: business, region: americas}
+      - {url: "https://www.cnbc.com/id/10000664/device/rss/rss.html", default: business, region: americas}
+      - {url: "https://www.cnbc.com/id/10001147/device/rss/rss.html", default: business, region: americas}
+      - {url: "https://www.cnbc.com/id/19854910/device/rss/rss.html", section: tech}
+
+  - id: techcrunch
+    name: TechCrunch
+    en: TechCrunch
+    lang: en
+    feeds:
+      - {url: "https://techcrunch.com/feed/", section: tech}
+
+  - id: ars
+    name: Ars Technica
+    en: Ars Technica
+    lang: en
+    feeds:
+      - {url: "https://feeds.arstechnica.com/arstechnica/index", section: tech}
+
+  - id: engadget
+    name: Engadget
+    en: Engadget
+    lang: en
+    feeds:
+      - {url: "https://www.engadget.com/rss.xml", section: tech}
+
+  # ---------- 中文 ----------
+  - id: bbczh
+    name: BBC中文
+    en: BBC Chinese
+    lang: zh
+    t2s: true   # 这个 feed 是繁体字，转成简体
+    feeds:
+      - {url: "https://feeds.bbci.co.uk/zhongwen/simp/rss.xml", rank: true}
+
+  - id: nytcn
+    name: 纽约时报中文网
+    en: NYT Chinese
+    lang: zh
+    feeds:
+      - {url: "https://cn.nytimes.com/rss/"}
+
+  - id: dwzh
+    name: 德国之声中文
+    en: DW Chinese
+    lang: zh
+    feeds:
+      - {url: "https://rss.dw.com/rdf/rss-chi-all"}
+
+  - id: rfizh
+    name: 法广华语
+    en: RFI Chinese
+    lang: zh
+    feeds:
+      - {url: "https://www.rfi.fr/cn/rss"}
+
+  - id: chinanews
+    name: 中国新闻网
+    en: China News Service
+    lang: zh
+    feeds:
+      - {url: "https://www.chinanews.com.cn/rss/scroll-news.xml", region: china}
+      - {url: "https://www.chinanews.com.cn/rss/world.xml", section: news}
+      - {url: "https://www.chinanews.com.cn/rss/finance.xml", section: business, region: china}
+      - {url: "https://www.chinanews.com.cn/rss/health.xml", section: science, region: china}
+      - {url: "https://www.chinanews.com.cn/rss/culture.xml", section: culture, region: china}
+      - {url: "https://www.chinanews.com.cn/rss/sports.xml", section: sport}

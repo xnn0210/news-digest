@@ -1,0 +1,7 @@
+.venv/
+data/
+site/
+__pycache__/
+.env
+.claude/
+.tools/
