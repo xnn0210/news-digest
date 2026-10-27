@@ -96,6 +96,9 @@ h1, h2, h3, h4 { margin: 0; }
 .regions a { flex: none; padding: 5px 13px; border-radius: 999px; color: var(--ink-2); font-size: 13.5px; font-weight: 500; }
 .regions a:hover { background: var(--soft); color: var(--ink); }
 .regions a.on { background: var(--ink); color: var(--bg); }
+.subtools { display: flex; flex: none; align-items: center; gap: 10px; }
+.langseg a { display: inline-block; line-height: 22px; }
+.langseg a:not(.on):hover { color: var(--ink); }
 .srcbtn { display: inline-flex; flex: none; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink-2); font-size: 13px; font-weight: 500; cursor: pointer; }
 .srcbtn:hover, .srcbtn[aria-expanded="true"] { border-color: var(--ink-2); color: var(--ink); }
 .srcbtn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
@@ -119,8 +122,8 @@ h1, h2, h3, h4 { margin: 0; }
 .prow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px; font-size: 14px; }
 .prow small { display: block; color: var(--muted); font-size: 12px; }
 .seg { display: inline-flex; flex: none; padding: 2px; border-radius: 8px; background: var(--soft); }
-.seg button { padding: 4px 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.seg button.on { background: var(--pop); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .1), 0 0 0 .5px rgba(0, 0, 0, .06); }
+.seg button, .seg a { padding: 4px 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.seg button.on, .seg a.on { background: var(--pop); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .1), 0 0 0 .5px rgba(0, 0, 0, .06); }
 .switch { position: relative; flex: none; width: 36px; height: 22px; border: 0; border-radius: 11px; background: var(--line); cursor: pointer; transition: background .15s; }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .15s; }
 .switch[aria-checked="true"] { background: var(--ink); }
@@ -244,8 +247,10 @@ a.media:hover img { transform: scale(1.025); }
   .sections { margin: 0 -16px; padding: 0 6px; }
   .sections a { padding: 0 11px; font-size: 14.5px; }
   .sections a.on::after { left: 11px; right: 11px; }
-  .subnav { height: 48px; gap: 10px; }
-  .regions .lbl, .srcbtn .long { display: none; }
+  .subnav { flex-wrap: wrap; height: auto; padding: 8px 0 10px; gap: 8px 10px; }
+  .regions { flex: 1 1 100%; }
+  .subtools { flex: 1 1 100%; justify-content: space-between; }
+  .regions .lbl, .srcbtn .long, .langseg .long { display: none; }
   .regions a { padding: 5px 11px; }
   .pop, .pop.left { left: 0; right: 0; width: auto; }
   .front { padding: 20px 0 28px; }
@@ -318,7 +323,10 @@ a.media:hover img { transform: scale(1.025); }
 <div class="wrap">
   <div class="subnav">
     <div class="regions" id="regions"></div>
-    <button class="srcbtn" id="srcBtn" data-pop="srcPop" aria-expanded="false"></button>
+    <div class="subtools">
+      <nav class="seg langseg" id="langSeg" aria-label="媒体语言"></nav>
+      <button class="srcbtn" id="srcBtn" data-pop="srcPop" aria-expanded="false"></button>
+    </div>
     <div class="pop" id="srcPop" hidden></div>
   </div>
   <main id="main"></main>
@@ -347,7 +355,7 @@ a.media:hover img { transform: scale(1.025); }
   };
   var ICON_DOWN = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m3 4.5 3 3 3-3"/></svg>';
 
-  var SRC = {}, SEC = {}, REG = {};
+  var SRC = {}, SEC = {}, REG = {}, LANG = { en: "英文媒体", zh: "中文媒体" };
   D.sources.forEach(function (s) { SRC[s.id] = s; });
   D.sections.forEach(function (s) { SEC[s.id] = s.name; });
   D.regions.forEach(function (r) { REG[r.id] = r.name; });
@@ -379,20 +387,23 @@ a.media:hover img { transform: scale(1.025); }
     hideRead: !!saved.hideRead,
     hidden: (saved.hidden || []).filter(function (id) { return SRC[id]; })
   };
-  var route = { s: "home", r: null }, query = [], shown = STEP;
+  var route = { s: "home", r: null, l: null }, query = [], shown = STEP;
   var read = new Set(store.get("nd-read", []));
 
   function savePref() { store.set("nd3", pref); }
   function parseHash() {
     var p = new URLSearchParams(location.hash.slice(1));
-    var s = p.get("s"), r = p.get("r");
+    var s = p.get("s"), r = p.get("r"), l = p.get("l");
     route.s = SEC[s] || s === "latest" ? s : "home";
     route.r = REG[r] ? r : null;
+    route.l = LANG[l] ? l : null;
   }
-  function hashFor(s, r) {
+  function hashFor(s, r, l) {   // 不传 l 时保留当前的语言筛选
+    if (l === undefined) l = route.l;
     var p = [];
     if (s && s !== "home") p.push("s=" + s);
     if (r) p.push("r=" + r);
+    if (l) p.push("l=" + l);
     return "#" + p.join("&");
   }
   function markRead(id) {
@@ -404,6 +415,7 @@ a.media:hover img { transform: scale(1.025); }
   function pass(it, ignoreSources) {
     if (!ignoreSources && pref.hidden.indexOf(it.s) >= 0) return false;
     if (route.r && it.g.indexOf(route.r) < 0) return false;
+    if (route.l && it.lg !== route.l) return false;
     if (pref.hideRead && read.has(it.i)) return false;
     for (var i = 0; i < query.length; i++) if (it.hay.indexOf(query[i]) < 0) return false;
     return true;
@@ -486,7 +498,7 @@ a.media:hover img { transform: scale(1.025); }
     var seen = {}, links = [];
     seen[it.s] = 1;
     (GROUP[it.k] || []).forEach(function (o) {
-      if (seen[o.s] || pref.hidden.indexOf(o.s) >= 0) return;
+      if (seen[o.s] || pref.hidden.indexOf(o.s) >= 0 || (route.l && o.lg !== route.l)) return;
       seen[o.s] = 1;
       links.push('<a href="' + esc(o.l) + '" target="_blank" rel="noopener noreferrer" data-id="' + o.i + '">' + esc(SRC[o.s].name) + "</a>");
     });
@@ -528,7 +540,7 @@ a.media:hover img { transform: scale(1.025); }
   }
   function scopeLabel(items) {
     var media = new Set(items.map(function (it) { return it.s; })).size;
-    return (route.r ? REG[route.r] : "全球") + " · " + items.length + " 篇报道 · " + media + " 家媒体";
+    return (route.r ? REG[route.r] : "全球") + (route.l ? " · " + LANG[route.l] : "") + " · " + items.length + " 篇报道 · " + media + " 家媒体";
   }
 
   // ---------- 页面 ----------
@@ -591,6 +603,10 @@ a.media:hover img { transform: scale(1.025); }
       return '<a href="' + hashFor(route.s, r.id) + '"' + (route.r === r.id ? ' class="on"' : "") + ">" + esc(r.name) + "</a>";
     }).join("");
 
+    $("langSeg").innerHTML = [[null, "全部"], ["en", "英文"], ["zh", "中文"]].map(function (o) {
+      return '<a href="' + hashFor(route.s, route.r, o[0]) + '"' + (route.l === o[0] ? ' class="on"' : "") + ">" + o[1] +
+        (o[0] ? '<span class="long">媒体</span>' : "") + "</a>";
+    }).join("");
     var shownSrc = D.sources.filter(function (s) { return present[s.id] && pref.hidden.indexOf(s.id) < 0; }).length;
     $("srcBtn").innerHTML = (pref.hidden.length ? '<span class="dot"></span>来源 · ' + shownSrc + " 家" : '<span><span class="long">全部</span>来源</span>') + ICON_DOWN;
 
@@ -611,12 +627,14 @@ a.media:hover img { transform: scale(1.025); }
     var n = {};
     D.items.forEach(function (it) { if (pass(it, true)) n[it.s] = (n[it.s] || 0) + 1; });
     var h = "<h4>来源" + (pref.hidden.length ? '<button data-allsrc>全部显示</button>' : "") + "</h4>";
-    [["en", "英文媒体"], ["zh", "中文媒体"]].forEach(function (g, gi) {
+    var first = true;
+    [["en", "英文媒体"], ["zh", "中文媒体"]].forEach(function (g) {
+      if (route.l && route.l !== g[0]) return;
       var list = D.sources.filter(function (s) { return s.lang === g[0] && present[s.id]; });
       if (!list.length) return;
-      var allOn = list.every(function (s) { return pref.hidden.indexOf(s.id) < 0; });
-      if (gi) h += '<div class="sep"></div>';
-      h += "<h4>" + g[1] + '<button data-grp="' + g[0] + '">' + (allOn ? "只看这组" : "全选") + "</button></h4>";
+      if (!first) h += '<div class="sep"></div>';
+      first = false;
+      h += "<h4>" + g[1] + "</h4>";
       list.forEach(function (s) {
         h += '<button class="opt' + (pref.hidden.indexOf(s.id) < 0 ? " on" : "") + '" data-src="' + s.id + '"><span class="box"></span><span class="nm">' + esc(s.name) +
           (s.en && s.en !== s.name ? '<span class="en">' + esc(s.en) + "</span>" : "") + '</span><span class="n">' + (n[s.id] || 0) + "</span></button>";
@@ -647,8 +665,8 @@ a.media:hover img { transform: scale(1.025); }
     $("footGrid").innerHTML =
       '<div><div class="wordmark">每日新闻</div><p>汇集 ' + names.length + " 家主流媒体官方网站的公开新闻，按栏目和地区整理，每天早上 7:00 更新。</p>" +
       (D.translator ? "<p>英文标题和摘要由 Claude（" + esc(D.translator) + "）自动翻译成中文，仅供快速浏览，以原文为准。</p>" : "") + "</div>" +
-      '<div><h4>栏目</h4><ul>' + D.sections.map(function (s) { return '<li><a href="' + hashFor(s.id, null) + '">' + esc(s.name) + "</a></li>"; }).join("") +
-      '<li><a href="' + hashFor("latest", null) + '">最新报道</a></li></ul></div>' +
+      '<div><h4>栏目</h4><ul>' + D.sections.map(function (s) { return '<li><a href="' + hashFor(s.id, null, null) + '">' + esc(s.name) + "</a></li>"; }).join("") +
+      '<li><a href="' + hashFor("latest", null, null) + '">最新报道</a></li></ul></div>' +
       "<div><h4>媒体</h4><p>" + names.map(function (s) { return esc(s.name); }).join(" · ") + "</p></div>";
     var note = "数据来自各媒体官方 RSS · " + D.feeds.ok + "/" + D.feeds.total + " 个频道更新成功";
     if (D.failed.length) {
@@ -683,20 +701,13 @@ a.media:hover img { transform: scale(1.025); }
       if (k >= 0) pref.hidden.splice(k, 1); else pref.hidden.push(id);
       savePref(); render(); return;
     }
-    if ((el = t.closest("[data-grp]"))) {
-      var grp = D.sources.filter(function (s) { return s.lang === el.dataset.grp; }).map(function (s) { return s.id; });
-      var allOn = grp.every(function (id) { return pref.hidden.indexOf(id) < 0; });
-      pref.hidden = allOn ? D.sources.filter(function (s) { return grp.indexOf(s.id) < 0; }).map(function (s) { return s.id; })
-        : pref.hidden.filter(function (id) { return grp.indexOf(id) < 0; });
-      savePref(); render(); return;
-    }
     if (t.closest("[data-allsrc]")) { pref.hidden = []; savePref(); render(); return; }
     if ((el = t.closest("[data-tr]"))) { pref.tr = el.dataset.tr; savePref(); render(); return; }
     if (t.closest("[data-hide-read]")) { pref.hideRead = !pref.hideRead; savePref(); render(); return; }
     if (t.closest("[data-more]")) { shown += STEP; renderMain(); return; }
     if (t.closest("[data-reset]")) {
       pref.hidden = []; pref.hideRead = false; savePref(); closeSearch();
-      location.hash = hashFor(route.s === "home" || query.length ? "home" : route.s, null);
+      location.hash = hashFor(route.s === "home" || query.length ? "home" : route.s, null, null);
       render(); return;
     }
     if ((el = t.closest("a[data-id]"))) {
