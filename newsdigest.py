@@ -184,13 +184,27 @@ def fetch(url: str, timeout: int) -> list:
                 raise ValueError(f"无法解析: {parsed.bozo_exception}")
             return parsed.entries
         except urllib.error.HTTPError as e:
-            if attempt or e.code in (401, 403, 404, 410):
+            if attempt or e.code in (401, 404, 410):
                 raise
+            time.sleep(6 if e.code in (403, 429) else 2)   # 被限流时多等一会儿再试
         except Exception:
             if attempt:
                 raise
-        time.sleep(2)
+            time.sleep(2)
     return []
+
+
+def fetch_host(jobs: list, timeout: int) -> list:
+    """同一个网站的 feed 依次抓取、间隔一下，避免同时请求太多被当成机器人拒绝。"""
+    results = []
+    for i, job in enumerate(jobs):
+        if i:
+            time.sleep(0.5)
+        try:
+            results.append((job, fetch(job["url"], timeout)))
+        except Exception as e:
+            results.append((job, e))
+    return results
 
 
 def short_error(e: Exception) -> str:
@@ -328,27 +342,28 @@ def collect(cfg: dict, now: datetime):
     }
     jobs = feed_jobs(cfg)
     articles, status = {}, []
+    by_host = defaultdict(list)
+    for job in jobs:
+        by_host[urllib.parse.urlsplit(job["url"]).netloc].append(job)
     with cf.ThreadPoolExecutor(s["workers"]) as ex:
-        futures = {ex.submit(fetch, j["url"], s["timeout"]): j for j in jobs}
-        for fut in cf.as_completed(futures):
-            job = futures[fut]
-            sid = job["source"]["id"]
-            try:
-                entries = fut.result()
-            except Exception as e:
-                status.append({"s": sid, "url": job["url"], "ok": False, "err": short_error(e)})
+        futures = [ex.submit(fetch_host, group, s["timeout"]) for group in by_host.values()]
+        results = [r for fut in cf.as_completed(futures) for r in fut.result()]
+    for job, entries in results:
+        sid = job["source"]["id"]
+        if isinstance(entries, Exception):
+            status.append({"s": sid, "url": job["url"], "ok": False, "err": short_error(entries)})
+            continue
+        kept = 0
+        for position, entry in enumerate(entries, 1):
+            a = normalize(entry, job, position, now, cutoff, matchers)
+            if not a:
                 continue
-            kept = 0
-            for position, entry in enumerate(entries, 1):
-                a = normalize(entry, job, position, now, cutoff, matchers)
-                if not a:
-                    continue
-                kept += 1
-                if a["uid"] in articles:
-                    merge(articles[a["uid"]], a)
-                else:
-                    articles[a["uid"]] = a
-            status.append({"s": sid, "url": job["url"], "ok": True, "entries": len(entries), "kept": kept})
+            kept += 1
+            if a["uid"] in articles:
+                merge(articles[a["uid"]], a)
+            else:
+                articles[a["uid"]] = a
+        status.append({"s": sid, "url": job["url"], "ok": True, "entries": len(entries), "kept": kept})
     for a in articles.values():
         a["section"], a["section_auto"] = choose_section(a)
     return articles, status
