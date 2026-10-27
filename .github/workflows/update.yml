@@ -12,6 +12,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write   # 最后一步用来防止定时任务被自动停用
 
 concurrency:
   group: pages
@@ -61,3 +62,9 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v5
+
+      # 公开仓库 60 天没有提交时，GitHub 会自动停用定时任务；每次运行时重新启用一次，计时就会重置
+      - name: 保持每日定时任务有效
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update.yml/enable"
